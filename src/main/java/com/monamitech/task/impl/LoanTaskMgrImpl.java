@@ -6,10 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import com.monamitech.model.SAFModel;
 import com.monamitech.task.importer.TaskImporter;
-import com.monamitech.task.mgr.DefaultTaskMgrImpl;
 import com.monamitech.task.mgr.ITaskManager;
+import com.monamitech.task.model.SAFModel;
 
 @Component("loanTaskMgrImpl")
 public class LoanTaskMgrImpl implements ITaskManager {

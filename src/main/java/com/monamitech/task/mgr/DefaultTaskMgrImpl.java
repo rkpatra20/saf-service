@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.monamitech.model.SAFModel;
+import com.monamitech.task.model.SAFModel;
 
 @Component("defaultTaskMgrImpl")
 public class DefaultTaskMgrImpl implements ITaskManager {
