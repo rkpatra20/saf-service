@@ -136,6 +136,7 @@ class SAFModelRowMapper implements RowMapper<SAFModel> {
 	@Override
 	public SAFModel mapRow(ResultSet rs, int rowNum) throws SQLException {
 		// TODO Auto-generated method stub
+		// extract all but not the failures
 		return null;
 	}
 
