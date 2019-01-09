@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import com.monamitech.task.importer.TaskImporter;
 import com.monamitech.task.mgr.ITaskManager;
 import com.monamitech.task.model.SAFModel;
+import com.monamitech.task.model.SAFStatus;
 
 @Component("loanTaskMgrImpl")
 public class LoanTaskMgrImpl implements ITaskManager {
@@ -21,7 +22,7 @@ public class LoanTaskMgrImpl implements ITaskManager {
 	@Scheduled(cron = "0/2 * * * * ?")
 	public void taskRunner() {
 		
-		taskImporter.importTask(10, "PENDING","loanTaskMgrImpl");
+		taskImporter.importTask(10, SAFStatus.PENDING.name(),"loanTaskMgrImpl");
 	}
 
 	@Override

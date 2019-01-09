@@ -13,7 +13,8 @@ public class DefaultTaskMgrImpl implements ITaskManager {
 
 	@Override
 	public void executeTask(SAFModel safModel) {
-		LOGGER.error("executing default task manager impl");
+		LOGGER.warn("executing default task manager impl, SAF_ID"+safModel.getSafId());
+		throw new RuntimeException("dummy exception");
 	}
 
 }

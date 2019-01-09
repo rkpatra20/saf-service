@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -30,12 +31,14 @@ public class SAFModelDao {
 	private final String SELECT_SAF_MODEL_Q1 = "SELECT * FROM TBL_SAF WHERE SERVICE_NAME=:SN AND RETRY_COUNT=:RC AND STATUS=:STATUS";
 
 	private final String SELECT_SAF_MODEL_Q2 = "SELECT * FROM TBL_SAF WHERE SAF_ID=:SAF_ID";
-	
+
 	private final String SELECT_SAF_MODEL_Q3 = "SELECT FAILURES FROM TBL_SAF WHERE SAF_ID=:SAF_ID";
-	
-	private final String UPDATE_ON_ERROR="UPDATE TBL_SAF SET FAILURES=:FAILURES, RETRY_COUNT=RETRY_COUNT+1 WHERE SAF_ID=:SAF_ID";
-	
-	private final String UPDATE_ON_SUCCESS="UPDATE TBL_SAF SET RESPONSE=:RESPONSE,STATUS=:STATUS RETRY_COUNT=RETRY_COUNT+1 WHERE SAF_ID=:SAF_ID";
+
+	private final String UPDATE_ON_ERROR = "UPDATE TBL_SAF SET FAILURES=:FAILURES, RETRY_COUNT=:RETRY_COUNT WHERE SAF_ID=:SAF_ID";
+
+	private final String UPDATE_ON_SUCCESS = "UPDATE TBL_SAF SET RESPONSE=:RESPONSE,STATUS=:STATUS, RETRY_COUNT=:RETRY_COUNT WHERE SAF_ID=:SAF_ID";
+
+	private final String SELECT_SAF_MODEL_Q4 = "SELECT * FROM TBL_SAF";
 
 	@Autowired
 	private NamedParameterJdbcTemplate namedParameterJdbcTemplate;
@@ -47,11 +50,11 @@ public class SAFModelDao {
 		inputs.put("REQ", model.getRequest());
 		inputs.put("FS", model.getFromSystem());
 		inputs.put("TS", model.getToSystem());
-		
+
 		inputs.put("INSERTED_DT", new Date());
-		inputs.put("STATUS", SAFStatus.ERROR.name());
-        inputs.put("FAILURES", model.getRetryFailures());
-        
+		inputs.put("STATUS", SAFStatus.PENDING.name());
+		inputs.put("FAILURES", model.getRetryFailures());
+
 		KeyHolder kh = new GeneratedKeyHolder();
 		MapSqlParameterSource source = new MapSqlParameterSource(inputs);
 		namedParameterJdbcTemplate.update(INSERT_SAF_MODEL, source, kh);
@@ -70,63 +73,94 @@ public class SAFModelDao {
 
 		List<SAFModel> models = new ArrayList<>();
 		try {
-			models = namedParameterJdbcTemplate.query(SELECT_SAF_MODEL_Q1, source,new SAFModelRowMapper());
+			models = namedParameterJdbcTemplate.query(SELECT_SAF_MODEL_Q1, source, new SAFModelRowMapper());
 		} catch (Exception e) {
 			// TODO: handle exception
 		}
 		return models;
 	}
-	
-	public int updateSAFModelOnError(Integer safId,String failureText, Integer retryCount)
-	{
-		List<SAFRetryFailure> models=findSAFRetryFailureById(safId);
-		SAFRetryFailure safRetryFailure=new SAFRetryFailure();
+
+	public int updateSAFModelOnError(Integer safId, String failureText, Integer retryCount) {
+		List<SAFRetryFailure> models = findSAFRetryFailureById(safId);
+		SAFRetryFailure safRetryFailure = new SAFRetryFailure();
 		safRetryFailure.setFailureResponse(failureText);
-		safRetryFailure.setCurrentRetryCount(retryCount+1);
+		safRetryFailure.setCurrentRetryCount(retryCount + 1);
 		safRetryFailure.setRetryAt(new Date());
 		models.add(safRetryFailure);
-		String safRetryFailureJson=JsonUtils.toString(models);
-		
-		Map<String,Object> inputs=new HashMap<>();
+		String safRetryFailureJson = JsonUtils.toString(models);
+
+		Map<String, Object> inputs = new HashMap<>();
 		inputs.put("FAILURES", safRetryFailureJson);
 		inputs.put("SAF_ID", safId);
-		MapSqlParameterSource source=new MapSqlParameterSource(inputs);
+		inputs.put("RETRY_COUNT", retryCount);
+		MapSqlParameterSource source = new MapSqlParameterSource(inputs);
 		return namedParameterJdbcTemplate.update(UPDATE_ON_ERROR, source);
-		
+
 	}
-	public int updateSAFModelOnSuccess(Integer safId,String response,Integer retryCount)
-	{
-		Map<String,Object> inputs=new HashMap<>();
+
+	public int updateSAFModelOnSuccess(Integer safId, String response, Integer retryCount) {
+		Map<String, Object> inputs = new HashMap<>();
 		inputs.put("RESPONSE", response);
 		inputs.put("SAF_ID", safId);
 		inputs.put("STATUS", SAFStatus.SUCCESS.name());
-		MapSqlParameterSource source=new MapSqlParameterSource(inputs);
+		inputs.put("RETRY_COUNT", retryCount);
+		MapSqlParameterSource source = new MapSqlParameterSource(inputs);
 		return namedParameterJdbcTemplate.update(UPDATE_ON_SUCCESS, source);
 	}
-	
-	public SAFModel findById(Integer safId)
-	{
-		Map<String,Object> inputs=new HashMap<>();
-		inputs.put("SAF_ID", safId);
-		MapSqlParameterSource source=new MapSqlParameterSource(inputs);
-		SAFModel model=new SAFModel();
+
+	public List<SAFModel> selectAll(String status) {
+		Map<String, Object> paramMap = new HashMap<>();
+		StringBuffer sbQuery = new StringBuffer(SELECT_SAF_MODEL_Q4);
+
+		if (validSafStatus(status)) {
+			sbQuery.append(" WHERE STATUS=:STATUS");
+			paramMap.put("STATUS", status);
+		}
+		List<SAFModel> list=new ArrayList<>();
 		try {
-			model=namedParameterJdbcTemplate.queryForObject(SELECT_SAF_MODEL_Q2, source, new SAFModelRowMapper());
+			list= namedParameterJdbcTemplate.query(sbQuery.toString(), paramMap, new SAFModelRowMapper());
+		} catch (EmptyResultDataAccessException e) {
+			// TODO: handle exception
+		}
+		return list;
+	}
+
+	private boolean validSafStatus(String status) {
+		// TODO Auto-generated method stub
+		try {
+			SAFStatus.valueOf(status);
+			return true;
+		} catch (Exception e) {
+			// TODO: handle exception
+			return false;
+		}
+	}
+
+	public SAFModel findById(Integer safId) {
+		Map<String, Object> inputs = new HashMap<>();
+		inputs.put("SAF_ID", safId);
+		MapSqlParameterSource source = new MapSqlParameterSource(inputs);
+		SAFModel model = new SAFModel();
+		try {
+			model = namedParameterJdbcTemplate.queryForObject(SELECT_SAF_MODEL_Q2, source, new SAFModelRowMapper());
 		} catch (Exception e) {
 			// TODO: handle exception
 		}
 		return model;
 	}
-	
-	public List<SAFRetryFailure> findSAFRetryFailureById(Integer safId)
-	{
-		Map<String,Object> inputs=new HashMap<>();
-		inputs.put("SAF_ID", safId);
-		MapSqlParameterSource source=new MapSqlParameterSource(inputs);
-		String result=namedParameterJdbcTemplate.queryForObject(SELECT_SAF_MODEL_Q3, source, String.class);
-		SAFRetryFailure[] safRetryFailures=JsonUtils.toObject(result, SAFRetryFailure[].class);
-		List<SAFRetryFailure> list= new ArrayList<>();
-		list.addAll(Arrays.asList(safRetryFailures));
+
+	public List<SAFRetryFailure> findSAFRetryFailureById(Integer safId) {
+		List<SAFRetryFailure> list = new ArrayList<>();
+		try {
+			Map<String, Object> inputs = new HashMap<>();
+			inputs.put("SAF_ID", safId);
+			MapSqlParameterSource source = new MapSqlParameterSource(inputs);
+			String result = namedParameterJdbcTemplate.queryForObject(SELECT_SAF_MODEL_Q3, source, String.class);
+			SAFRetryFailure[] safRetryFailures = JsonUtils.toObject(result, SAFRetryFailure[].class);
+			list.addAll(Arrays.asList(safRetryFailures));
+		} catch (EmptyResultDataAccessException e) {
+			// e.printStackTrace();
+		}
 		return list;
 	}
 }
@@ -141,4 +175,3 @@ class SAFModelRowMapper implements RowMapper<SAFModel> {
 	}
 
 }
-

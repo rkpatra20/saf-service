@@ -20,6 +20,7 @@ public class TaskRunner implements Runnable {
 	}
 
 	public SAFModel getModel() {
+
 		return model;
 	}
 
@@ -36,6 +37,13 @@ public class TaskRunner implements Runnable {
 
 	@Override
 	public void run() {
+		String lockKey = this.model.getSafId() + this.model.getServiceName();
+		synchronized (lockKey.intern()) {
+			forwardToTaskImpl();
+		}
+	}
+
+	public void forwardToTaskImpl() {
 		ITaskManager taskManager = null;
 		if (model == null || model.getServiceName() == null) {
 			LOGGER.warn("unable to process model");
@@ -43,18 +51,24 @@ public class TaskRunner implements Runnable {
 		}
 		taskManager = SAFUtils.getTaskManager(model.getServiceName());
 		Integer safId = new Integer(model.getSafId());
-		Integer retryCount=new Integer(model.getRetryCount());
+		Integer retryCount = new Integer(model.getRetryCount());
+		boolean isTaskExecutedSuccessfully = false;
 		try {
 			taskManager.executeTask(model);
-			int count=safModelDao.updateSAFModelOnSuccess(safId, model.getResponse(),retryCount);
-			LOGGER.info("rows updated:{} for SAF_ID: {}",count,safId);
+			isTaskExecutedSuccessfully = true;
 		} catch (Exception e) {
+			LOGGER.error("FAILURE_SAF_ID: " + safId);
 			LOGGER.error(e.toString(), e);
 			String errorJson = e.getClass().getName();
-			int count=safModelDao.updateSAFModelOnError(safId, errorJson,retryCount);
-			LOGGER.warn("rows updated:{} for SAF_ID: {}",count,safId);
+			int count = safModelDao.updateSAFModelOnError(safId, errorJson, retryCount+1);
+			LOGGER.warn("task failed!! rows updated:{} for SAF_ID: {}", count, safId);
+		} finally {
+			if (isTaskExecutedSuccessfully) {
+				int count = safModelDao.updateSAFModelOnSuccess(safId, model.getResponse(), retryCount+1);
+				LOGGER.error("SUCCESS_SAF_ID: " + safId);
+				LOGGER.info("task success!! rows updated:{} for SAF_ID: {}", count, safId);
+			}
 		}
-
 	}
 
 }

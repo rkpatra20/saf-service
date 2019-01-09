@@ -45,6 +45,8 @@ public class SAFModel {
 	}
 
 	public Integer getRetryCount() {
+		if(retryCount==null)
+			return 0;
 		return retryCount;
 	}
 
@@ -105,6 +107,8 @@ public class SAFModel {
 	}
 
 	public Integer getSafId() {
+		if(safId==null)
+			return 0;
 		return safId;
 	}
 
