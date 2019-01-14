@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.transaction.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.RowMapper;
@@ -24,11 +26,12 @@ import com.monamitech.task.model.SAFStatus;
 import com.monamitech.task.util.JsonUtils;
 
 @Repository
+@Transactional
 public class SAFModelDao {
 
-	private final String INSERT_SAF_MODEL = "INSERT INTO TBL_SAF(SERVICE_NAME,REQUEST,FROM_SYSTEM,TO_SYSTEM,INSERTED_AT,STATUS,FAILURES) VALUES(:SN,:REQ,:FS,:TS,:INSERTED_AT,:STATUS,:FAILURES)";
+	private final String INSERT_SAF_MODEL = "INSERT INTO TBL_SAF(SERVICE_NAME,REQUEST,FROM_SYSTEM,TO_SYSTEM,STATUS,FAILURES,RETRY_COUNT) VALUES(:SN,:REQ,:FS,:TS,:STATUS,:FAILURES,:RETRY_COUNT)";
 
-	private final String SELECT_SAF_MODEL_Q1 = "SELECT * FROM TBL_SAF WHERE SERVICE_NAME=:SN AND RETRY_COUNT=:RC AND STATUS=:STATUS";
+	private final String SELECT_SAF_MODEL_Q1 = "SELECT * FROM TBL_SAF WHERE SERVICE_NAME= :SN AND RETRY_COUNT < :RC AND STATUS= :STATUS";
 
 	private final String SELECT_SAF_MODEL_Q2 = "SELECT * FROM TBL_SAF WHERE SAF_ID=:SAF_ID";
 
@@ -36,7 +39,7 @@ public class SAFModelDao {
 
 	private final String UPDATE_ON_ERROR = "UPDATE TBL_SAF SET FAILURES=:FAILURES, RETRY_COUNT=:RETRY_COUNT WHERE SAF_ID=:SAF_ID";
 
-	private final String UPDATE_ON_SUCCESS = "UPDATE TBL_SAF SET RESPONSE=:RESPONSE,STATUS=:STATUS, RETRY_COUNT=:RETRY_COUNT WHERE SAF_ID=:SAF_ID";
+	private final String UPDATE_ON_SUCCESS = "UPDATE TBL_SAF SET RESPONSE=:RESPONSE,STATUS=:STATUS, RETRY_COUNT=:RETRY_COUNT WHERE SAF_ID=:SAF_ID AND STATUS=:PENDING";
 
 	private final String SELECT_SAF_MODEL_Q4 = "SELECT * FROM TBL_SAF";
 
@@ -50,11 +53,10 @@ public class SAFModelDao {
 		inputs.put("REQ", model.getRequest());
 		inputs.put("FS", model.getFromSystem());
 		inputs.put("TS", model.getToSystem());
-
-		inputs.put("INSERTED_DT", new Date());
+        inputs.put("RETRY_COUNT", 0);
 		inputs.put("STATUS", SAFStatus.PENDING.name());
-		inputs.put("FAILURES", model.getRetryFailures());
-
+		inputs.put("FAILURES", JsonUtils.toString(model.getRetryFailures()));
+        
 		KeyHolder kh = new GeneratedKeyHolder();
 		MapSqlParameterSource source = new MapSqlParameterSource(inputs);
 		namedParameterJdbcTemplate.update(INSERT_SAF_MODEL, source, kh);
@@ -63,19 +65,17 @@ public class SAFModelDao {
 	}
 
 	public List<SAFModel> importSAFModel(SAFModel model) {
-		Map<String, Object> inputs = new HashMap<>();
-
-		inputs.put("SN", model.getServiceName());
-		inputs.put("RC", model.getRetryCount());
-		inputs.put("STATUS", SAFStatus.valueOf(model.getStatus()));
-
-		MapSqlParameterSource source = new MapSqlParameterSource(inputs);
-
+		//Map<String, Object> inputs = new HashMap<>();
+		MapSqlParameterSource inputs = new MapSqlParameterSource();
+		inputs.addValue("SN", model.getServiceName());
+    	inputs.addValue("RC", model.getRetryCount());
+		inputs.addValue("STATUS", SAFStatus.valueOf(model.getStatus()).name());
 		List<SAFModel> models = new ArrayList<>();
 		try {
-			models = namedParameterJdbcTemplate.query(SELECT_SAF_MODEL_Q1, source, new SAFModelRowMapper());
+			models = namedParameterJdbcTemplate.query(SELECT_SAF_MODEL_Q1, inputs, new SAFModelRowMapper());
 		} catch (Exception e) {
 			// TODO: handle exception
+			e.printStackTrace();
 		}
 		return models;
 	}
@@ -169,9 +169,16 @@ class SAFModelRowMapper implements RowMapper<SAFModel> {
 
 	@Override
 	public SAFModel mapRow(ResultSet rs, int rowNum) throws SQLException {
-		// TODO Auto-generated method stub
-		// extract all but not the failures
-		return null;
+		SAFModel model=new SAFModel();
+		model.setStatus(rs.getString("STATUS"));;
+		model.setServiceName(rs.getString("SERVICE_NAME"));;
+		model.setSafId(rs.getInt("SAF_ID"));;
+		model.setRetryCount(rs.getInt("RETRY_COUNT"));;
+		model.setFromSystem(rs.getString("FROM_SYSTEM"));;
+		model.setToSystem(rs.getString("FROM_SYSTEM"));
+		model.setInsertedDt(rs.getDate("INSERTED_AT"));;
+		System.out.println("model.hash");
+		return model;
 	}
 
 }

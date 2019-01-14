@@ -23,8 +23,6 @@ public class TaskImporter {
 		model.setStatus(SAFStatus.valueOf(status).name());
 		model.setServiceName(serviceBean);
 		List<SAFModel> models = safModelDao.importSAFModel(model);
-		models.add(new SAFModel("loanTaskMgrImpl"));
-		models.add(new SAFModel("test"));
 		TaskThreadPool.execute(models, safModelDao);
 	}
 

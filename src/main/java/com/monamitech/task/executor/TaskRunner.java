@@ -37,7 +37,7 @@ public class TaskRunner implements Runnable {
 
 	@Override
 	public void run() {
-		String lockKey = this.model.getSafId() + this.model.getServiceName();
+		String lockKey = this.model.getServiceName()+this.model.getSafId();
 		synchronized (lockKey.intern()) {
 			forwardToTaskImpl();
 		}
@@ -65,8 +65,8 @@ public class TaskRunner implements Runnable {
 		} finally {
 			if (isTaskExecutedSuccessfully) {
 				int count = safModelDao.updateSAFModelOnSuccess(safId, model.getResponse(), retryCount+1);
-				LOGGER.error("SUCCESS_SAF_ID: " + safId);
-				LOGGER.info("task success!! rows updated:{} for SAF_ID: {}", count, safId);
+				LOGGER.warn("SUCCESS_SAF_ID: " + safId);
+				LOGGER.warn("task success!! rows updated:{} for SAF_ID: {}", count, safId);
 			}
 		}
 	}

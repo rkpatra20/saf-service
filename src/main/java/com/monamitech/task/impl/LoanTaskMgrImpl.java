@@ -29,9 +29,7 @@ public class LoanTaskMgrImpl implements ITaskManager {
 	public void executeTask(SAFModel safModel) {
 		// TODO Auto-generated method stub
 
-		LOGGER.info(safModel + " child" + System.currentTimeMillis());
-
-		LOGGER.info("executed");
+		LOGGER.info("LoanTaskMgrImpl");
 
 	}
 
